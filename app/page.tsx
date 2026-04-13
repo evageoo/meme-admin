@@ -29,10 +29,11 @@ export default async function MemeAdmin() {
     .order('total_votes', { ascending: false })
     .limit(3)
 
-  const totalRows = scoreData?.length || 0
-  const avgVotes = totalRows > 0
-    ? (scoreData.reduce((acc, curr) => acc + (curr.total_votes || 0), 0) / totalRows).toFixed(2)
-    : 0
+// This version is "Null-Safe" for the Vercel compiler
+const totalRows = scoreData?.length || 0
+const avgVotes = totalRows > 0
+  ? ((scoreData || []).reduce((acc, curr) => acc + (curr.total_votes || 0), 0) / totalRows).toFixed(2)
+  : 0
 
   const tableList = {
     Profiles: await fetchTableData('profiles'),
