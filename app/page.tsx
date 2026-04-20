@@ -5,7 +5,7 @@ export default async function Home() {
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
 
-  // --- 1. THE AUTH WALL (Fixed for Vercel & High Contrast) ---
+  // --- 1. THE AUTH WALL ---
   if (!user || authError) {
     return (
       <main style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', backgroundColor: '#f8fafc', fontFamily: 'sans-serif' }}>
@@ -37,7 +37,7 @@ export default async function Home() {
     )
   }
 
-  // --- 2. THE SUPERADMIN CHECK (Security Requirement) ---
+  // --- 2. THE SUPERADMIN CHECK ---
   const { data: profile } = await supabase
     .from('profiles')
     .select('is_superadmin')
@@ -48,7 +48,8 @@ export default async function Home() {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', backgroundColor: '#fff', fontFamily: 'sans-serif' }}>
         <div style={{ textAlign: 'center', border: '3px solid #ef4444', padding: '50px', borderRadius: '40px', boxShadow: '15px 15px 0 #ef4444' }}>
-          <h1 style={{ color: '#ef4444', fontWeight: '900', fontSize: '2rem', textTransform: 'uppercase', italic: 'true' }}>Access Denied</h1>
+          {/* FIXED LINE BELOW: fontStyle instead of italic */}
+          <h1 style={{ color: '#ef4444', fontWeight: '900', fontSize: '2rem', textTransform: 'uppercase', fontStyle: 'italic' }}>Access Denied</h1>
           <p style={{ fontWeight: '700', marginTop: '10px' }}>User: {user.email}</p>
           <p style={{ fontSize: '12px', color: '#64748b', marginTop: '20px' }}>You do not have the required SUPERADMIN permissions.</p>
         </div>
@@ -56,7 +57,7 @@ export default async function Home() {
     )
   }
 
-  // --- 3. THE ADMIN DATA (Audit & Stats) ---
+  // --- 3. THE ADMIN DATA ---
   const { data: scoreData } = await supabase.from('caption_scores').select('total_votes')
   const { data: topPerformers } = await supabase
     .from('caption_scores')
