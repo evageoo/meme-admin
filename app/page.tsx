@@ -17,13 +17,17 @@ export default async function MemeAdmin() {
             'use server'
             const supabase = await createClient()
 
-            // Hardcoded to your production URL to prevent "localhost" redirect errors for graders
-            const baseUrl = 'https://meme-admin-nqsve3a2k-eva-georgaklis-projects.vercel.app'
+            // Dynamic URL logic: uses Vercel URL in prod, localhost:3000 in dev
+            // Inside the form action in app/page.tsx
+            const baseUrl = process.env.NEXT_PUBLIC_VERCEL_URL
+              ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
+              : 'http://localhost:3000'
 
             const { data } = await supabase.auth.signInWithOAuth({
               provider: 'google',
               options: {
-                redirectTo: `${baseUrl}/auth/callback?next=/meme-admin`
+                // Change this to point to / instead of /meme-admin
+                redirectTo: `${baseUrl}/auth/callback?next=/`
               },
             })
             if (data.url) redirect(data.url)
@@ -37,8 +41,28 @@ export default async function MemeAdmin() {
     )
   }
 
-  // --- 2. THE ADMIN DATA (Only loads if authenticated) ---
-  // Fetching data for the stats dashboard
+  // --- 2. THE SUPERADMIN CHECK (Rubric Requirement) ---
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('is_superadmin')
+    .eq('id', user.id)
+    .single()
+
+  if (!profile?.is_superadmin) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-10 font-sans">
+        <div className="bg-white p-10 rounded-[32px] shadow-xl border border-red-100 text-center">
+          <h1 className="text-red-600 font-black text-xl uppercase mb-2">Access Denied</h1>
+          <p className="text-slate-500 text-sm">Your account ({user.email}) does not have Superadmin privileges.</p>
+          <div className="mt-6 pt-6 border-t border-slate-100">
+            <p className="text-[10px] font-mono text-slate-300 uppercase italic">Contact system administrator for elevation.</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // --- 3. THE ADMIN DATA (Only loads if authenticated AND superadmin) ---
   const { data: scoreData } = await supabase.from('caption_scores').select('total_votes')
   const { data: topPerformers } = await supabase
     .from('caption_scores')
@@ -46,13 +70,11 @@ export default async function MemeAdmin() {
     .order('total_votes', { ascending: false })
     .limit(3)
 
-  // Null-safe calculations for the production build
   const totalRows = scoreData?.length || 0
   const avgVotes = totalRows > 0
     ? ((scoreData || []).reduce((acc, curr) => acc + (curr.total_votes || 0), 0) / totalRows).toFixed(2)
     : 0
 
-  // Helper to fetch audit logs for the grid
   const fetchAudit = async (table: string) => {
     const { data, count } = await supabase.from(table).select('created_by_user_id', { count: 'exact' }).limit(5)
     return { rows: data || [], total: count || 0 }
