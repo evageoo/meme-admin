@@ -1,47 +1,43 @@
 import { createClient } from '@/utils/supabaseServer'
 import { redirect } from 'next/navigation'
 
-export default async function MemeAdmin() {
+export default async function Home() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
 
-  // --- 1. THE AUTH WALL (Fixes the -100 pts Failure) ---
-  if (!user) {
+  // --- 1. THE AUTH WALL (Fixed for Vercel & High Contrast) ---
+  if (!user || authError) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-10 font-sans">
-        <div className="bg-white p-12 rounded-[48px] shadow-xl border border-slate-100 text-center max-w-md">
-          <h2 className="text-3xl font-black uppercase italic tracking-tighter mb-4 text-slate-900">Auth Required</h2>
-          <p className="text-slate-400 text-sm mb-8 uppercase tracking-widest font-mono italic">Terminal connection lost. Please authenticate.</p>
-
+      <main style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', backgroundColor: '#f8fafc', fontFamily: 'sans-serif' }}>
+        <div style={{ backgroundColor: '#fff', padding: '60px', borderRadius: '48px', textAlign: 'center', border: '3px solid #000', boxShadow: '20px 20px 0px #000', maxWidth: '420px' }}>
+          <h1 style={{ color: '#000', marginBottom: '8px', fontSize: '2.5rem', fontWeight: '900', letterSpacing: '-0.07em', fontStyle: 'italic', textTransform: 'uppercase' }}>Auth Required</h1>
+          <p style={{ color: '#000', fontSize: '0.75rem', marginBottom: '40px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.2em', opacity: 0.5 }}>Terminal Connection: Restricted</p>
+          
           <form action={async () => {
             'use server'
             const supabase = await createClient()
-
-            // Dynamic URL logic: uses Vercel URL in prod, localhost:3000 in dev
-            // Inside the form action in app/page.tsx
-            const baseUrl = process.env.NEXT_PUBLIC_VERCEL_URL
-              ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
+            const baseUrl = process.env.NEXT_PUBLIC_VERCEL_URL 
+              ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` 
               : 'http://localhost:3000'
-
+              
             const { data } = await supabase.auth.signInWithOAuth({
               provider: 'google',
-              options: {
-                // Change this to point to / instead of /meme-admin
-                redirectTo: `${baseUrl}/auth/callback?next=/`
+              options: { 
+                redirectTo: `${baseUrl}/auth/callback` 
               },
             })
             if (data.url) redirect(data.url)
           }}>
-            <button className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl hover:bg-blue-700 transition-all uppercase tracking-widest text-xs shadow-lg shadow-blue-200">
+            <button style={{ width: '100%', padding: '20px', backgroundColor: '#2563eb', color: 'white', border: '3px solid #000', borderRadius: '20px', cursor: 'pointer', fontWeight: '900', fontSize: '1rem', textTransform: 'uppercase', letterSpacing: '0.1em', boxShadow: '0 8px 0 #0044cc' }}>
               Initialize Admin Session
             </button>
           </form>
         </div>
-      </div>
+      </main>
     )
   }
 
-  // --- 2. THE SUPERADMIN CHECK (Rubric Requirement) ---
+  // --- 2. THE SUPERADMIN CHECK (Security Requirement) ---
   const { data: profile } = await supabase
     .from('profiles')
     .select('is_superadmin')
@@ -50,19 +46,17 @@ export default async function MemeAdmin() {
 
   if (!profile?.is_superadmin) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-10 font-sans">
-        <div className="bg-white p-10 rounded-[32px] shadow-xl border border-red-100 text-center">
-          <h1 className="text-red-600 font-black text-xl uppercase mb-2">Access Denied</h1>
-          <p className="text-slate-500 text-sm">Your account ({user.email}) does not have Superadmin privileges.</p>
-          <div className="mt-6 pt-6 border-t border-slate-100">
-            <p className="text-[10px] font-mono text-slate-300 uppercase italic">Contact system administrator for elevation.</p>
-          </div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', backgroundColor: '#fff', fontFamily: 'sans-serif' }}>
+        <div style={{ textAlign: 'center', border: '3px solid #ef4444', padding: '50px', borderRadius: '40px', boxShadow: '15px 15px 0 #ef4444' }}>
+          <h1 style={{ color: '#ef4444', fontWeight: '900', fontSize: '2rem', textTransform: 'uppercase', italic: 'true' }}>Access Denied</h1>
+          <p style={{ fontWeight: '700', marginTop: '10px' }}>User: {user.email}</p>
+          <p style={{ fontSize: '12px', color: '#64748b', marginTop: '20px' }}>You do not have the required SUPERADMIN permissions.</p>
         </div>
       </div>
     )
   }
 
-  // --- 3. THE ADMIN DATA (Only loads if authenticated AND superadmin) ---
+  // --- 3. THE ADMIN DATA (Audit & Stats) ---
   const { data: scoreData } = await supabase.from('caption_scores').select('total_votes')
   const { data: topPerformers } = await supabase
     .from('caption_scores')
@@ -71,9 +65,7 @@ export default async function MemeAdmin() {
     .limit(3)
 
   const totalRows = scoreData?.length || 0
-  const avgVotes = totalRows > 0
-    ? ((scoreData || []).reduce((acc, curr) => acc + (curr.total_votes || 0), 0) / totalRows).toFixed(2)
-    : 0
+  const avgVotes = totalRows > 0 ? (scoreData!.reduce((acc, curr) => acc + (curr.total_votes || 0), 0) / totalRows).toFixed(2) : 0
 
   const fetchAudit = async (table: string) => {
     const { data, count } = await supabase.from(table).select('created_by_user_id', { count: 'exact' }).limit(5)
@@ -88,62 +80,52 @@ export default async function MemeAdmin() {
   }
 
   return (
-    <main className="p-10 bg-slate-50 min-h-screen font-sans">
-      <header className="mb-12 max-w-7xl mx-auto flex justify-between items-end">
+    <main style={{ padding: '40px', backgroundColor: '#f8fafc', minHeight: '100vh', fontFamily: 'sans-serif', color: '#000' }}>
+      <header style={{ maxWidth: '1100px', margin: '0 auto 60px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
         <div>
-          <h1 className="text-6xl font-black uppercase tracking-tighter italic text-slate-900 leading-none">Admin Domain</h1>
-          <p className="text-[10px] font-mono text-slate-400 mt-4 uppercase tracking-[0.4em] italic text-blue-600">Michael_Audit_System_v12 // ONLINE</p>
+          <h1 style={{ fontSize: '4.5rem', fontWeight: '900', margin: 0, letterSpacing: '-0.08em', fontStyle: 'italic', textTransform: 'uppercase', lineHeight: '0.9' }}>Admin Domain</h1>
+          <p style={{ color: '#2563eb', fontWeight: '900', fontSize: '11px', letterSpacing: '0.4em', textTransform: 'uppercase', marginTop: '15px' }}>Michael_Audit_System_v12 // ONLINE</p>
         </div>
-        <div className="text-right">
-          <p className="text-[9px] font-mono text-slate-300 uppercase">Node_Auth</p>
-          <p className="text-[10px] font-bold text-blue-600 truncate max-w-[200px]">{user.email}</p>
+        <div style={{ textAlign: 'right' }}>
+          <p style={{ margin: 0, color: '#000', fontSize: '10px', fontWeight: '900', opacity: 0.3, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Authenticated_Node</p>
+          <p style={{ margin: 0, fontWeight: '900', fontSize: '16px', color: '#2563eb' }}>{user.email}</p>
         </div>
       </header>
 
-      {/* DASHBOARD STATS */}
-      <section className="mb-12 grid grid-cols-1 md:grid-cols-3 gap-6 max-w-7xl mx-auto">
-        <div className="bg-blue-600 text-white p-10 rounded-[42px] shadow-xl">
-          <h4 className="text-[10px] uppercase font-black tracking-widest opacity-60 mb-6">Engagement</h4>
-          <p className="text-5xl font-black">{avgVotes}</p>
-          <p className="text-[10px] uppercase font-bold opacity-60">Avg Votes / Caption</p>
+      <div style={{ maxWidth: '1100px', margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '30px' }}>
+        <div style={{ backgroundColor: '#2563eb', color: 'white', padding: '50px', borderRadius: '40px', border: '4px solid #000', boxShadow: '15px 15px 0 #000' }}>
+          <p style={{ fontSize: '11px', fontWeight: '900', letterSpacing: '0.2em', opacity: 0.8 }}>AVG ENGAGEMENT</p>
+          <h2 style={{ fontSize: '5rem', margin: '15px 0', fontWeight: '900', letterSpacing: '-0.05em' }}>{avgVotes}</h2>
+          <p style={{ fontSize: '11px', fontWeight: '700' }}>VOTES / CAPTION_ID</p>
         </div>
 
-        <div className="bg-white p-10 rounded-[42px] border border-slate-200 col-span-2">
-          <h4 className="text-[10px] uppercase font-black tracking-widest text-slate-400 mb-6">Top Captions</h4>
-          <div className="space-y-3">
-            {topPerformers && topPerformers.length > 0 ? (
-              topPerformers.map((cap, i) => (
-                <div key={i} className="flex justify-between text-xs font-bold text-slate-700 border-b border-slate-50 pb-2">
-                  <span className="truncate italic">"{cap.display_text}"</span>
-                  <span className="font-mono text-blue-600 ml-4">{cap.total_votes}pts</span>
-                </div>
-              ))
-            ) : (
-              <p className="text-slate-300 italic text-[10px]">No engagement data available.</p>
-            )}
-          </div>
+        <div style={{ backgroundColor: 'white', padding: '50px', borderRadius: '40px', border: '4px solid #000', boxShadow: '15px 15px 0 #000' }}>
+          <p style={{ fontSize: '11px', fontWeight: '900', letterSpacing: '0.2em', color: '#64748b', marginBottom: '25px' }}>TOP PERFORMERS</p>
+          {topPerformers?.map((p, i) => (
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '15px 0', borderBottom: '2px solid #f1f5f9' }}>
+              <span style={{ fontWeight: '900', fontSize: '16px', fontStyle: 'italic' }}>"{p.display_text}"</span>
+              <span style={{ color: '#2563eb', fontWeight: '900', fontSize: '18px' }}>{p.total_votes}pts</span>
+            </div>
+          ))}
         </div>
-      </section>
+      </div>
 
-      {/* AUDIT LOGS GRID */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 max-w-7xl mx-auto">
+      <div style={{ maxWidth: '1100px', margin: '40px auto', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '25px' }}>
         {Object.entries(audits).map(([name, data]) => (
-          <div key={name} className="bg-white p-6 rounded-[32px] border border-slate-200 hover:border-blue-300 transition-colors">
-            <div className="flex justify-between mb-6">
-              <h3 className="text-[10px] font-black uppercase text-slate-400">{name}</h3>
-              <span className="text-[10px] font-mono text-slate-300 font-bold">{data.total}</span>
+          <div key={name} style={{ backgroundColor: 'white', padding: '25px', borderRadius: '30px', border: '3px solid #000' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px' }}>
+              <h4 style={{ margin: 0, fontSize: '10px', fontWeight: '900', color: '#94a3b8' }}>{name.toUpperCase()}</h4>
+              <span style={{ fontSize: '10px', fontWeight: '900', backgroundColor: '#f1f5f9', padding: '2px 6px', borderRadius: '5px' }}>{data.total}</span>
             </div>
-            <div className="space-y-2">
-              {data.rows.map((row: any, i) => (
-                <div key={i} className="text-[7px] font-mono bg-slate-50 p-2 rounded-lg truncate text-slate-400">
-                  AUDIT: {row.created_by_user_id || 'SYSTEM_GEN'}
-                </div>
-              ))}
-            </div>
+            {data.rows.map((r: any, i) => (
+              <div key={i} style={{ fontSize: '9px', fontWeight: '700', fontFamily: 'monospace', backgroundColor: '#f8fafc', padding: '8px', marginBottom: '6px', borderRadius: '10px', border: '1px solid #e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                AUDIT: {r.created_by_user_id?.substring(0, 12)}...
+              </div>
+            ))}
           </div>
         ))}
       </div>
-      <div className="h-20" />
+      <div style={{ height: '60px' }} />
     </main>
   )
 }
