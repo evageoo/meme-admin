@@ -18,7 +18,7 @@ export default async function MemeAdmin() {
             const supabase = await createClient()
 
             // FIX: Prioritize Vercel URL over localhost
-            const baseUrl = process.env.NEXT_PUBLIC_VERCEL_URL
+            const baseUrl = 'https://meme-admin-nqsve3a2k-eva-georgaklis-projects.vercel.app'
               ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
               : 'http://localhost:3000'
 
